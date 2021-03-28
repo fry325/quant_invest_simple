@@ -115,116 +115,117 @@ class invest_score:
         return max_dd
 
 
-'''
-parameters:
-    year: 测试集截止时间（年）
-    month: 测试集截止时间（月）
-    params: LightGBM模型的参数
-    data: 有监督学习数据
-    date_series: 储存了回测的所有时间
-    portf: 投资组合对象
-    amt: 回测的资金，随着时间而变化的序列
-'''
-year = 2017
-month = 1
-interval = [-10, 0, 10]
-params = {
-    'boosting_type': 'gbdt', 
-    'num_level': 31, 
-    'n_estimators': 150, 
-    'learning_rate': 0.08, 
-    'gamma': 0.05, 
-    'max_depth': 6, 
-    'sub_sample': 0.9, 
-    'random_state': 1
-    }
-data = pd.read_csv("data_supervised.csv", index_col=0)
-data['date'] = pd.to_datetime(data['date'], format='%Y-%m-%d')
-date_series = pd.Series(data.date.unique())
-date_series = date_series[date_series>dt.datetime(year=year, month=month, day=15)]
-date_series.index = range(len(date_series))
-portf = Portfolio()
-amts = pd.Series(0, index=date_series)
-amts[0] = portf.amt
+if __name__ == "__main__":
+    '''
+    parameters:
+        year: 测试集截止时间（年）
+        month: 测试集截止时间（月）
+        params: LightGBM模型的参数
+        data: 有监督学习数据
+        date_series: 储存了回测的所有时间
+        portf: 投资组合对象
+        amt: 回测的资金，随着时间而变化的序列
+    '''
+    year = 2017
+    month = 1
+    interval = [-10, 0, 10]
+    params = {
+        'boosting_type': 'gbdt', 
+        'num_level': 31, 
+        'n_estimators': 150, 
+        'learning_rate': 0.08, 
+        'gamma': 0.05, 
+        'max_depth': 6, 
+        'sub_sample': 0.9, 
+        'random_state': 1
+        }
+    data = pd.read_csv("data_supervised.csv", index_col=0)
+    data['date'] = pd.to_datetime(data['date'], format='%Y-%m-%d')
+    date_series = pd.Series(data.date.unique())
+    date_series = date_series[date_series>dt.datetime(year=year, month=month, day=15)]
+    date_series.index = range(len(date_series))
+    portf = Portfolio()
+    amts = pd.Series(0, index=date_series)
+    amts[0] = portf.amt
 
-for i in range(len(date_series)):
-    # 定义一些循环体内变量
-    amt = portf.amt
-    stocks = portf.stocks
-    year = portf.date.year
-    month = portf.date.month
-    
-    # 拟合模型
-    X_train, X_test, y_train, y_test, weight, code = prepare_data(data, year, month, bins=interval)
-    model_lgbm = LGBMClassifier(**params)
-    model_lgbm.fit(X_train, y_train, weight)
-    
-    # 找出上涨概率最大的20个股票
-    y_proba = model_lgbm.predict_proba(X_test)
-    y_proba = pd.DataFrame(data=y_proba, index=code, columns=[0, 1])
-    top_20 = y_proba.sort_values(by=[1], ascending=False).index[:20]
-    
-    # 看看股票池有没有股票，有就先卖出，没有就不管
-    if len(stocks) > 0:
-        for code in stocks:
-            portf.sell(code, stocks[code])
-    
-    # 买入
-    price_top20 = pd.DataFrame(data={'code': top_20})
-    temp = []
-    for j in range(20):
-        temp.append(portf.price[top_20[j]][portf.date])
-    price_top20['price'] = temp
-    price_top20.sort_values(by='price', ascending=False, inplace=True)
-    price_top20.index = range(20)
-    num_stocks = 5  # 持有5个股票
-    j = 0
-    for code in price_top20.code:
-        cash_code = portf.cash / (num_stocks - j)
-        price_per_hand = price_top20.price[j] * 100
-        hand = cash_code // price_per_hand
-        buy = portf.buy(code, hand * 100)
-        if buy == 1:
-            j += 1
-        if j >= num_stocks:
-            break
+    for i in range(len(date_series)):
+        # 定义一些循环体内变量
+        amt = portf.amt
+        stocks = portf.stocks
+        year = portf.date.year
+        month = portf.date.month
+        
+        # 拟合模型
+        X_train, X_test, y_train, y_test, weight, code = prepare_data(data, year, month, bins=interval)
+        model_lgbm = LGBMClassifier(**params)
+        model_lgbm.fit(X_train, y_train, weight)
+        
+        # 找出上涨概率最大的20个股票
+        y_proba = model_lgbm.predict_proba(X_test)
+        y_proba = pd.DataFrame(data=y_proba, index=code, columns=[0, 1])
+        top_20 = y_proba.sort_values(by=[1], ascending=False).index[:20]
+        
+        # 看看股票池有没有股票，有就先卖出，没有就不管
+        if len(stocks) > 0:
+            for code in stocks:
+                portf.sell(code, stocks[code])
+        
+        # 买入
+        price_top20 = pd.DataFrame(data={'code': top_20})
+        temp = []
+        for j in range(20):
+            temp.append(portf.price[top_20[j]][portf.date])
+        price_top20['price'] = temp
+        price_top20.sort_values(by='price', ascending=False, inplace=True)
+        price_top20.index = range(20)
+        num_stocks = 5  # 持有5个股票
+        j = 0
+        for code in price_top20.code:
+            cash_code = portf.cash / (num_stocks - j)
+            price_per_hand = price_top20.price[j] * 100
+            hand = cash_code // price_per_hand
+            buy = portf.buy(code, hand * 100)
+            if buy == 1:
+                j += 1
+            if j >= num_stocks:
+                break
 
-    # 时间后移一个月
-    print(f"{portf.date.year}年{portf.date.month}月{portf.date.day}日 -> 调仓完成")
-    if i != len(date_series) - 1:
-        portf.date_running(date_series[i+1]-date_series[i])
-        amts[i+1] = portf.amt
-    
-    
-# 获取深证成指信息
-szcz = pd.read_csv("399001.csv", header=None, squeeze=True)
-szcz.index = amts.index
-amts_g = amts / amts[0]
-szcz_g = szcz / szcz[0]
+        # 时间后移一个月
+        print(f"{portf.date.year}年{portf.date.month}月{portf.date.day}日 -> 调仓完成")
+        if i != len(date_series) - 1:
+            portf.date_running(date_series[i+1]-date_series[i])
+            amts[i+1] = portf.amt
+        
+        
+    # 获取深证成指信息
+    szcz = pd.read_csv("399001.csv", header=None, squeeze=True)
+    szcz.index = amts.index
+    amts_g = amts / amts[0]
+    szcz_g = szcz / szcz[0]
 
-# 画图
-matplotlib.rcParams['font.family'] = 'STSong'
-plt.figure(figsize=(30, 20))
-plt.plot(szcz_g, color='r', linewidth=6, label="深证成指")
-plt.plot(amts_g, color='b', linewidth=6, label="量化策略回测")
-plt.fill_between(amts_g.index, 1, amts_g, color='b', alpha=0.2)
-plt.axhline(y=1, color='black', linestyle='--', linewidth=2, alpha=0.5)
-plt.xlabel("时间", fontsize=40)
-plt.ylabel("走势（以1为基准）", fontsize=40)
-plt.tick_params(labelsize=30)
-plt.legend(prop={'size': 40})
-plt.show()
+    # 画图
+    matplotlib.rcParams['font.family'] = 'STSong'
+    plt.figure(figsize=(30, 20))
+    plt.plot(szcz_g, color='r', linewidth=6, label="深证成指")
+    plt.plot(amts_g, color='b', linewidth=6, label="量化策略回测")
+    plt.fill_between(amts_g.index, 1, amts_g, color='b', alpha=0.2)
+    plt.axhline(y=1, color='black', linestyle='--', linewidth=2, alpha=0.5)
+    plt.xlabel("时间", fontsize=40)
+    plt.ylabel("走势（以1为基准）", fontsize=40)
+    plt.tick_params(labelsize=30)
+    plt.legend(prop={'size': 40})
+    plt.show()
 
 
-# 计算年化收益、夏普比率、最大回撤
-print("深证成指")
-szcz_score = invest_score(szcz)
-print("年化收益 -> ", np.round(szcz_score.rate_of_return()*100, 4), "%", sep="")
-print("夏普比率 -> ", np.round(szcz_score.sharpe_ratio(), 4), sep="")
-print("最大回撤 -> ", np.round(szcz_score.mdd()*100, 4), "%", sep="")
+    # 计算年化收益、夏普比率、最大回撤
+    print("深证成指")
+    szcz_score = invest_score(szcz)
+    print("年化收益 -> ", np.round(szcz_score.rate_of_return()*100, 4), "%", sep="")
+    print("夏普比率 -> ", np.round(szcz_score.sharpe_ratio(), 4), sep="")
+    print("最大回撤 -> ", np.round(szcz_score.mdd()*100, 4), "%", sep="")
 
-print("\n基于LightGBM算法的量化策略")
-amts_score = invest_score(amts)
-print("年化收益 -> ", np.round(amts_score.rate_of_return()*100, 4), "%", sep="")
-print("夏普比率 -> ", np.round(amts_score.sharpe_ratio(), 4), sep="")
-print("最大回撤 -> ", np.round(amts_score.mdd()*100, 4), "%", sep="")
+    print("\n基于LightGBM算法的量化策略")
+    amts_score = invest_score(amts)
+    print("年化收益 -> ", np.round(amts_score.rate_of_return()*100, 4), "%", sep="")
+    print("夏普比率 -> ", np.round(amts_score.sharpe_ratio(), 4), sep="")
+    print("最大回撤 -> ", np.round(amts_score.mdd()*100, 4), "%", sep="")

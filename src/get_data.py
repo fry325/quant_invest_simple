@@ -43,28 +43,29 @@ def get_data(code):
 2020年11月14日17时运行记录:
     已经获取了188个数据，从000001.SZ到002136.SZ，剩下的数据超过限制了
 '''
-count = 0
-start = time.time()
-count_permin = 0
-for code in stocks_pool:
-    temp = get_data(code)
-    
-    # 当存在Error时断掉循环
-    if temp == -1:
-        print(f"Error occurs at {code}")
-        break
-    
-    df = pd.DataFrame(data=np.array(temp.Data).T, index=temp.Times, columns=temp.Fields)
-    df.to_csv(data_path + f"/series/{code[:-3]}.csv")
-    count += 1
-    if count % 10 == 0:
-        print(count)
+if __name__ == "__main__":
+    count = 0
+    start = time.time()
+    count_permin = 0
+    for code in stocks_pool:
+        temp = get_data(code)
         
-    # 控制每分钟循环不超过200次，防止达到数据库请求上限
-    now = time.time()
-    duration = now - start
-    if count_permin >= 199 and duration <= 59:
-        print("Sleep for a while...")
-        time.sleep(61-duration)
-        count_permin = 0
-        start = time.time()
+        # 当存在Error时断掉循环
+        if temp == -1:
+            print(f"Error occurs at {code}")
+            break
+        
+        df = pd.DataFrame(data=np.array(temp.Data).T, index=temp.Times, columns=temp.Fields)
+        df.to_csv(data_path + f"/series/{code[:-3]}.csv")
+        count += 1
+        if count % 10 == 0:
+            print(count)
+            
+        # 控制每分钟循环不超过200次，防止达到数据库请求上限
+        now = time.time()
+        duration = now - start
+        if count_permin >= 199 and duration <= 59:
+            print("Sleep for a while...")
+            time.sleep(61-duration)
+            count_permin = 0
+            start = time.time()
