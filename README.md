@@ -1,1 +1,1 @@
-# quant_invest_simple
+研一上学期->金融数据科学作业->基于LightGBM算法的量化投资策略
